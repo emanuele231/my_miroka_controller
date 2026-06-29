@@ -14,6 +14,8 @@ from sensor_msgs.msg import PointCloud2, JointState
 from geometry_msgs.msg import PoseStamped, Quaternion
 from enchanted_msgs.msg import ExtendedJointState, ControlMode
 
+from enum import Enum
+
 
 # ------------------------------ Helpers ------------------------------------ #
 
@@ -68,6 +70,7 @@ class HappinessWave(Node):
         self.neck_pub = self.create_publisher(ExtendedJointState, neck_target_topic, qos)
         self.left_arm_pub = self.create_publisher(ExtendedJointState, left_arm_topic, qos)
         self.right_arm_pub = self.create_publisher(ExtendedJointState, right_arm_topic, qos)
+        # self.face_pub = self.create_publisher(String, '/targets/face_animation', qos)
         self.goal_pub = self.create_publisher(PoseStamped, goal_pose_topic, goal_qos)
 
         # Subscriber (log only)
@@ -123,6 +126,10 @@ class HappinessWave(Node):
     def publish_wave_stream(self) -> None:
         now = self.get_clock().now().nanoseconds / 1e9
         elapsed = now - self.start_time
+        
+        # face_msg = String()
+	# face_msg.data = "FRIENDLY_SMILE"  # o "LAUGH", "HAPPY_COOING"
+	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:
             self.get_logger().info('Saluto completato. Nodo in standby.')

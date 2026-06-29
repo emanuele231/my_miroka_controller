@@ -14,6 +14,8 @@ from sensor_msgs.msg import PointCloud2, JointState
 from geometry_msgs.msg import PoseStamped, Quaternion
 from enchanted_msgs.msg import ExtendedJointState, ControlMode
 
+from enum import Enum
+
 
 def yaw_to_quaternion(yaw_rad: float) -> Quaternion:
     q = Quaternion()
@@ -58,6 +60,7 @@ class DisgustDemo(Node):
         self.ears_pub = self.create_publisher(ExtendedJointState, ears_target_topic, qos)
         self.left_arm_pub = self.create_publisher(ExtendedJointState, left_arm_topic, qos)
         self.right_arm_pub = self.create_publisher(ExtendedJointState, right_arm_topic, qos)
+        # self.face_pub = self.create_publisher(String, '/targets/face_animation', qos)
         self.goal_pub = self.create_publisher(PoseStamped, goal_pose_topic, qos)
 
         self.create_subscription(PointCloud2, pointcloud_topic, self._on_pointcloud, qos)
@@ -99,9 +102,13 @@ class DisgustDemo(Node):
     def _on_pointcloud(self, msg: PointCloud2) -> None:
         pass
 
-    def publish_sadness_stream(self) -> None:
+    def publish_disgust_stream(self) -> None:
         now = self.get_clock().now().nanoseconds / 1e9
         elapsed = now - self.start_time
+        
+        # face_msg = String()
+	# face_msg.data = "DISAPPOINTED"
+	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:
             self.get_logger().info('Disgusto completata. Nodo in standby.')
