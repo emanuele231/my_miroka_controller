@@ -51,9 +51,15 @@ class HappinessWave(Node):
                  goal_frame: str = 'map'):
         super().__init__('happiness_wave_demo')
 
-        # QoS esplicito richiesto da Mirokai
         qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            depth=10
+        )
+
+        # QoS per la navigazione (goal_pose), compatibile con la nav stack (RELIABLE)
+        goal_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
             depth=10
         )
@@ -62,7 +68,7 @@ class HappinessWave(Node):
         self.neck_pub = self.create_publisher(ExtendedJointState, neck_target_topic, qos)
         self.left_arm_pub = self.create_publisher(ExtendedJointState, left_arm_topic, qos)
         self.right_arm_pub = self.create_publisher(ExtendedJointState, right_arm_topic, qos)
-        self.goal_pub = self.create_publisher(PoseStamped, goal_pose_topic, qos)
+        self.goal_pub = self.create_publisher(PoseStamped, goal_pose_topic, goal_qos)
 
         # Subscriber (log only)
         self.create_subscription(PointCloud2, pointcloud_topic, self._on_pointcloud, qos)
