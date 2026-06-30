@@ -108,6 +108,7 @@ class AngerDemo(Node):
         
         # face_msg = String()
 	# face_msg.data = "ANGRY_SHOUT"
+	# sound_msg.data = "ANGER_GROWL"
 	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:

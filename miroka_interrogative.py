@@ -108,7 +108,8 @@ class ConfusionDemo(Node):
         elapsed = now - self.start_time
         
         # face_msg = String()
-	# face_msg.data = "LOOK_AROUND"
+	# face_msg.data = "LOOK_AROUND" 
+	# sound_msg.data = "INTERROGATIVE_COOING"
 	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:

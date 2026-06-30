@@ -108,6 +108,7 @@ class FearDemo(Node):
         
         # face_msg = String()
 	# face_msg.data = "SCARED_1"
+	# sound_msg.data = "FEAR_BREATH"
 	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:

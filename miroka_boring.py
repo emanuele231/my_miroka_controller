@@ -109,6 +109,7 @@ class BoringDemo(Node):
         
         # face_msg = String()
 	# face_msg.data = "YAWN"
+	# sound_msg.data = "NEUTRAL_COOING"
 	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:

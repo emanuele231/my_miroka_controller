@@ -108,6 +108,7 @@ class SeeingDemo(Node):
         
         # face_msg = String()
 	# face_msg.data = "FRIENDLY_SMILE"
+	# sound_msg.data = "INTEREST_OH"
 	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:

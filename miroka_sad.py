@@ -108,6 +108,7 @@ class SadnessDemo(Node):
         
         # face_msg = String()
 	# face_msg.data = "SAD"
+	# sound_msg.data = "SADNESS_MOPE"
 	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:

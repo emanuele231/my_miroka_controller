@@ -128,7 +128,8 @@ class HappinessWave(Node):
         elapsed = now - self.start_time
         
         # face_msg = String()
-	# face_msg.data = "FRIENDLY_SMILE"  # o "LAUGH", "HAPPY_COOING"
+	# face_msg.data = "FRIENDLY_SMILE"
+	# sound_msg.data = "HAPPY_COOING"
 	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:
