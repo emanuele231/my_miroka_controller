@@ -77,6 +77,8 @@ Movimenti: collo inclinato a lato, orecchie dritte
 Espressione facciale: LOOK_UP
 Effetto sonoro: --
 
+# MIROKA EMOTIONS AND INTENTION
+
 Una volta definite le librerie delle emozioni e delle intenzioni, quest'ultime verranno successivamente utilizzate insieme.
 Miroka potrà provare uno di questi sentimenti in base a delle condizioni che riesce a percepire grazie alla sua telecamera
 e al riconoscimento vocale.
