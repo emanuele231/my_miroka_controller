@@ -98,8 +98,8 @@ class HappinessWave(Node):
             "ARM_RIGHT_WRIST_SAGITTAL_JOINT"
         ]
 
-        self.left_arm_base = [-1.0, 0.2, 0.0, -1.2, 0.0, 0.0, 0.0]
-        self.right_arm_base = [-1.0, 0.2, 0.0, -1.2, 0.0, 0.0, 0.0]
+        self.left_arm_base = [-1.2, 1.4, 0.0, -1.4, 0.5, 0.0, 0.0]
+        self.right_arm_base = [-1.2, 1.4, 0.0, -1.4, 0.5, 0.0, 0.0]
         
         self.reset_arm_base = [0.0, 0.0, 0.0, -0.3, 0.0, 0.0, 0.0]
 
