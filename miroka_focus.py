@@ -119,6 +119,11 @@ class FocusDemo(Node):
         self.default_neck = [0.0, 0.0, 0.0]
         self.default_ears = [0.0, 0.0]
         
+        self.wave_joint_index = 5
+        self.wave_amplitude = 0.5
+        self.wave_frequency = 1.5
+
+        
         self.start_time = self.get_clock().now().nanoseconds / 1e9
         self.duration = 6.0
         self.timer = self.create_timer(0.05, self.publish_focus_stream)

@@ -5,6 +5,10 @@ ROS 2 — Disgust (still arms, ears down (except one))
 
 from typing import List
 import math
+import time
+import signal
+import sys
+import os
 
 import rclpy
 from rclpy.node import Node
@@ -13,8 +17,6 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from sensor_msgs.msg import PointCloud2, JointState
 from geometry_msgs.msg import PoseStamped, Quaternion
 from enchanted_msgs.msg import ExtendedJointState, ControlMode
-
-from enum import Enum
 
 
 def yaw_to_quaternion(yaw_rad: float) -> Quaternion:
@@ -38,6 +40,20 @@ def make_extended_joint_state(names: List[str], positions: List[float]) -> Exten
     msg.control_mode = ControlMode(state=ControlMode.POSITION)
     return msg
 
+def signal_handler_sigint(signum, frame):
+    print("\nCtrl+C rilevato. Chiusura pulita...")
+    if 'node' in globals():
+        node.publish_default_pose()
+    sys.exit(0)
+
+
+def signal_handler_sigtstp(signum, frame):
+    print("\nCtrl+Z rilevato. Torno in posizione di default prima di sospendere...")
+    if 'node' in globals():
+        node.publish_default_pose()
+    os.kill(os.getpid(), signal.SIGSTOP)
+
+
 
 class DisgustDemo(Node):
     def __init__(self,
@@ -48,10 +64,10 @@ class DisgustDemo(Node):
                  right_arm_topic: str = '/targets/right_arm',
                  goal_pose_topic: str = 'goal_pose',
                  goal_frame: str = 'map'):
-        super().__init__('sadness_demo')
+        super().__init__('Disgust_demo')
 
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
             depth=10
         )
@@ -60,7 +76,6 @@ class DisgustDemo(Node):
         self.ears_pub = self.create_publisher(ExtendedJointState, ears_target_topic, qos)
         self.left_arm_pub = self.create_publisher(ExtendedJointState, left_arm_topic, qos)
         self.right_arm_pub = self.create_publisher(ExtendedJointState, right_arm_topic, qos)
-        # self.face_pub = self.create_publisher(String, '/targets/face_animation', qos)
         self.goal_pub = self.create_publisher(PoseStamped, goal_pose_topic, qos)
 
         self.create_subscription(PointCloud2, pointcloud_topic, self._on_pointcloud, qos)
@@ -70,13 +85,12 @@ class DisgustDemo(Node):
             "HED_NECK_SAGITTAL_JOINT",
             "HED_NECK_TRANSVERSAL_JOINT"
         ]
-        self.neck_pos = [0.0, 0.10, 0.0]   # testa inclinata in basso
+        self.neck_pos = [0.0, 0.15, 0.0]  
 
         self.ears_names = [
             "HED_EAR_LEFT_JOINT", "HED_EAR_RIGHT_JOINT"
         ]
-        self.ears_pos = [0.0, 0.3]   # orecchie completamente in basso
-
+        self.ears_pos = [-0.3, 0.3]   
         self.left_arm_names = [
             "ARM_LEFT_SHOULDER_SAGITTAL_JOINT", "ARM_LEFT_SHOULDER_FRONTAL_JOINT",
             "ARM_LEFT_SHOULDER_TRANSVERSAL_JOINT", "ARM_LEFT_ELBOW_SAGITTAL_JOINT",
@@ -90,12 +104,21 @@ class DisgustDemo(Node):
             "ARM_RIGHT_WRIST_SAGITTAL_JOINT"
         ]
 
-        self.left_arm_base = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        self.right_arm_base = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.left_arm_base = [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0]
+        self.right_arm_base = [0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0]
+        
+        self.default_arms =  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        self.default_ears = [0.0, 0.0]
+        self.default_neck = [0.0, 0.0, 0.0]
+        
+        self.wave_joint_index = 5
+        self.wave_amplitude = 0.5
+        self.wave_frequency = 1.5
+
 
         self.start_time = self.get_clock().now().nanoseconds / 1e9
         self.duration = 6.0
-        self.timer = self.create_timer(0.05, self.publish_sadness_stream)
+        self.timer = self.create_timer(0.05, self.publish_disgust_stream)
 
         self.get_logger().info('disgusto avviata: braccia ferme')
 
@@ -106,13 +129,9 @@ class DisgustDemo(Node):
         now = self.get_clock().now().nanoseconds / 1e9
         elapsed = now - self.start_time
         
-        # face_msg = String()
-	# face_msg.data = "DISAPPOINTED"
-	# sound_msg.data = "TCHIP"
-	# self.face_pub.publish(face_msg)
-
         if elapsed > self.duration:
             self.get_logger().info('Disgusto completata. Nodo in standby.')
+            self.publish_default_pose()
             self.timer.cancel()
             return
 
@@ -127,6 +146,27 @@ class DisgustDemo(Node):
 
         right_msg = make_extended_joint_state(self.right_arm_names, self.right_arm_base)
         self.right_arm_pub.publish(right_msg)
+        
+    def publish_default_pose(self) -> None:
+        self.get_logger().info('Pubblicazione posizione di default...')
+        
+        for i in range(20):
+            neck_msg = make_extended_joint_state(self.neck_names, self.default_neck)
+            self.neck_pub.publish(neck_msg)
+
+            ears_msg = make_extended_joint_state(self.ears_names, self.default_ears)
+            self.ears_pub.publish(ears_msg)
+
+            left_msg = make_extended_joint_state(self.left_arm_names, self.default_arms)
+            self.left_arm_pub.publish(left_msg)
+
+            right_msg = make_extended_joint_state(self.right_arm_names, self.default_arms)
+            self.right_arm_pub.publish(right_msg)
+            
+            time.sleep(0.1)
+        
+        self.get_logger().info('Posizione di default pubblicata (braccia lungo il corpo).')
+
 
     def _publish_goal_absolute(self, *, frame_id: str, x: float, y: float, yaw: float) -> None:
         msg = PoseStamped()
@@ -141,8 +181,14 @@ class DisgustDemo(Node):
 
 
 def main():
+
+    global node
+    
+    signal.signal(signal.SIGINT, signal_handler_sigint)
+    signal.signal(signal.SIGTSTP, signal_handler_sigtstp)
+    
     rclpy.init()
-    node = SadnessDemo(
+    node = DisgustDemo(
         pointcloud_topic='point_cloud',
         ears_target_topic='/targets/ears',
         neck_target_topic='/targets/neck',
@@ -153,11 +199,15 @@ def main():
     )
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+    except Exception as e:
+        node.get_logger().error(f'Errore: {e}')
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':
