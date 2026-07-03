@@ -91,12 +91,12 @@ Miroka prova tristezza se, entro 3 secondi, non vede più nessuno (nessuno prese
 nel suo campo visivo).
 
 ### MIROKA - ARRABBIATO
-*da vedere*
+Tono di voce più alto del normale da parte dell'utente
 
 ### MIROKA - DISGUSTATO
 *da vedere*
 
-### MIROKA - INPAURITO
+### MIROKA - IMPAURITO
 *da vedere*
 
 ### MIROKA - SORPRESO
