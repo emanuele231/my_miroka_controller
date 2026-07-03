@@ -6,6 +6,10 @@ Tilted head, asymmetric ears, neutral still arms.
 
 from typing import List
 import math
+import time
+import signal
+import sys
+import os
 
 import rclpy
 from rclpy.node import Node
@@ -39,6 +43,19 @@ def make_extended_joint_state(names: List[str], positions: List[float]) -> Exten
     msg.control_mode = ControlMode(state=ControlMode.POSITION)
     return msg
 
+def signal_handler_sigint(signum, frame):
+    print("\nCtrl+C rilevato. Chiusura pulita...")
+    if 'node' in globals():
+        node.publish_default_pose()
+    sys.exit(0)
+
+
+def signal_handler_sigtstp(signum, frame):
+    print("\nCtrl+Z rilevato. Torno in posizione di default prima di sospendere...")
+    if 'node' in globals():
+        node.publish_default_pose()
+    os.kill(os.getpid(), signal.SIGSTOP)
+
 
 class ThinkingDemo(Node):
     def __init__(self,
@@ -52,7 +69,7 @@ class ThinkingDemo(Node):
         super().__init__('thinking_demo')
 
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
             depth=10
         )
@@ -76,7 +93,7 @@ class ThinkingDemo(Node):
         self.ears_names = [
             "HED_EAR_LEFT_JOINT", "HED_EAR_RIGHT_JOINT"
         ]
-        self.ears_pos = [0.6, 0.0]
+        self.ears_pos = [0.6, -0.3]
 
         self.left_arm_names = [
             "ARM_LEFT_SHOULDER_SAGITTAL_JOINT", "ARM_LEFT_SHOULDER_FRONTAL_JOINT",
@@ -93,10 +110,16 @@ class ThinkingDemo(Node):
 
         self.left_arm_base = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.right_arm_base = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        
+        self.reset_arm_base = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        
+        self.default_ears = [0.0, 0.0]
+        
+        self.default_neck = [0.0, 0.0, 0.0]
 
         self.start_time = self.get_clock().now().nanoseconds / 1e9
         self.duration = 6.0
-        self.timer = self.create_timer(0.05, self.publish_confusion_stream)
+        self.timer = self.create_timer(0.05, self.publish_thinking_stream)
 
         self.get_logger().info('"Sto pensando" avviata: testa inclinata, orecchie asimmetriche, braccia neutre, per 6s')
 
@@ -113,6 +136,7 @@ class ThinkingDemo(Node):
 
         if elapsed > self.duration:
             self.get_logger().info('"Sto pensando" completata. Nodo in standby.')
+            self.publish_default_pose()
             self.timer.cancel()
             return
 
@@ -127,6 +151,28 @@ class ThinkingDemo(Node):
 
         right_msg = make_extended_joint_state(self.right_arm_names, self.right_arm_base)
         self.right_arm_pub.publish(right_msg)
+        
+    def publish_default_pose(self) -> None:
+        self.get_logger().info('Pubblicazione posizione di default...')
+        
+        for i in range(20):
+        
+            neck_msg = make_extended_joint_state(self.neck_names, self.default_neck)
+            self.neck_pub.publish(neck_msg)
+            
+            ears_msg = make_extended_joint_state(self.ears_names, self.default_ears)
+            self.neck_pub.publish(ears_msg)
+
+            left_msg = make_extended_joint_state(self.left_arm_names, self.reset_arm_base)
+            self.left_arm_pub.publish(left_msg)
+
+            right_msg = make_extended_joint_state(self.right_arm_names, self.reset_arm_base)
+            self.right_arm_pub.publish(right_msg)
+            
+            time.sleep(0.1)
+        
+        self.get_logger().info('Posizione di default pubblicata (braccia lungo il corpo).')
+
 
     def _publish_goal_absolute(self, *, frame_id: str, x: float, y: float, yaw: float) -> None:
         msg = PoseStamped()
@@ -141,8 +187,14 @@ class ThinkingDemo(Node):
 
 
 def main():
+
+    global node
+    
+    signal.signal(signal.SIGINT, signal_handler_sigint)
+    signal.signal(signal.SIGTSTP, signal_handler_sigtstp)
+    
     rclpy.init()
-    node = ConfusionDemo(
+    node = ThinkingDemo(
         pointcloud_topic='point_cloud',
         ears_target_topic='/targets/ears',
         neck_target_topic='/targets/neck',
@@ -153,11 +205,15 @@ def main():
     )
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+    except Exception as e:
+        node.get_logger().error(f'Errore: {e}')
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':

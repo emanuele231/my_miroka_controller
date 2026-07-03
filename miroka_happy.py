@@ -61,6 +61,8 @@ class HappinessWave(Node):
                  neck_target_topic: str = '/targets/neck',
                  left_arm_topic: str = '/targets/left_arm',
                  right_arm_topic: str = '/targets/right_arm',
+                 right_fingers_topic: str = '/targets/arms/right/fingers',
+                 left_fingers_topic: str = '/targets/arms/left/fingers',
                  goal_pose_topic: str = 'goal_pose',
                  goal_frame: str = 'map'):
         super().__init__('happiness_wave_demo')
@@ -74,6 +76,8 @@ class HappinessWave(Node):
         self.neck_pub = self.create_publisher(ExtendedJointState, neck_target_topic, qos)
         self.left_arm_pub = self.create_publisher(ExtendedJointState, left_arm_topic, qos)
         self.right_arm_pub = self.create_publisher(ExtendedJointState, right_arm_topic, qos)
+        self.right_fingers_pub = self.create_publisher(ExtendedJointState, right_fingers_topic, qos)
+        self.left_fingers_pub = self.create_publisher(ExtendedJointState, left_fingers_topic, qos)
         self.goal_pub = self.create_publisher(PoseStamped, goal_pose_topic, qos)
 
         self.create_subscription(PointCloud2, pointcloud_topic, self._on_pointcloud, qos)
@@ -97,11 +101,17 @@ class HappinessWave(Node):
             "ARM_RIGHT_WRIST_FRONTAL_JOINT", "ARM_RIGHT_WRIST_TRANSVERSAL_JOINT",
             "ARM_RIGHT_WRIST_SAGITTAL_JOINT"
         ]
+        
+        self.left_fingers_names = ["LEFT_FINGERS"]
+        self.right_fingers_names = ["RIGHT_FINGERS"]
+        self.fingers_base = [1.0]
 
-        self.left_arm_base = [-1.2, 1.4, 0.0, -1.4, 0.5, 0.0, 0.0]
-        self.right_arm_base = [-1.2, 1.4, 0.0, -1.4, 0.5, 0.0, 0.0]
+        self.left_arm_base = [-1.2, 0.8, 0.0, -1.3, 0.0, 0.0, 0.0]
+        self.right_arm_base = [-1.2, 0.8, 0.0, -1.3, 0.0, 0.0, 0.0]
         
         self.reset_arm_base = [0.0, 0.0, 0.0, -0.3, 0.0, 0.0, 0.0]
+        
+        self.fingers_default = [0.0]
 
         self.wave_joint_index = 5
         self.wave_amplitude = 0.5
@@ -141,6 +151,12 @@ class HappinessWave(Node):
 
         right_msg = make_extended_joint_state(self.right_arm_names, right_pos)
         self.right_arm_pub.publish(right_msg)
+        
+        left_fingers_msg = make_extended_joint_state(self.left_fingers_names, self.fingers_base)
+        self.left_fingers_pub.publish(left_fingers_msg)
+
+        right_fingers_msg = make_extended_joint_state(self.right_fingers_names, self.fingers_base)
+        self.right_fingers_pub.publish(right_fingers_msg)
 
     def publish_default_pose(self) -> None:
         self.get_logger().info('Pubblicazione posizione di default...')
@@ -154,6 +170,12 @@ class HappinessWave(Node):
 
             right_msg = make_extended_joint_state(self.right_arm_names, self.reset_arm_base)
             self.right_arm_pub.publish(right_msg)
+            
+            left_fingers_msg = make_extended_joint_state(self.left_fingers_names, self.fingers_default)
+            self.left_fingers_pub.publish(left_fingers_msg)
+
+            right_fingers_msg = make_extended_joint_state(self.right_fingers_names, self.fingers_default)
+            self.right_fingers_pub.publish(right_fingers_msg)
             
             time.sleep(0.1)
         
@@ -183,6 +205,8 @@ def main():
         neck_target_topic='/targets/neck',
         left_arm_topic='/targets/left_arm',
         right_arm_topic='/targets/right_arm',
+        right_fingers_topic='/targets/arms/right/fingers',
+        left_fingers_topic='/targets/arms/left/fingers',
         goal_pose_topic='goal_pose',
         goal_frame='map',
     )
