@@ -5,6 +5,10 @@ ROS 2 — Happiness (Wave with both arms)
 
 from typing import List
 import math
+import time
+import signal
+import sys
+import os
 
 import rclpy
 from rclpy.node import Node
@@ -14,10 +18,6 @@ from sensor_msgs.msg import PointCloud2, JointState
 from geometry_msgs.msg import PoseStamped, Quaternion
 from enchanted_msgs.msg import ExtendedJointState, ControlMode
 
-from enum import Enum
-
-
-# ------------------------------ Helpers ------------------------------------ #
 
 def yaw_to_quaternion(yaw_rad: float) -> Quaternion:
     q = Quaternion()
@@ -41,7 +41,19 @@ def make_extended_joint_state(names: List[str], positions: List[float]) -> Exten
     return msg
 
 
-# ------------------------------ Node --------------------------------------- #
+def signal_handler_sigint(signum, frame):
+    print("\nCtrl+C rilevato. Chiusura pulita...")
+    if 'node' in globals():
+        node.publish_default_pose()
+    sys.exit(0)
+
+
+def signal_handler_sigtstp(signum, frame):
+    print("\nCtrl+Z rilevato. Torno in posizione di default prima di sospendere...")
+    if 'node' in globals():
+        node.publish_default_pose()
+    os.kill(os.getpid(), signal.SIGSTOP)
+
 
 class HappinessWave(Node):
     def __init__(self,
@@ -54,40 +66,25 @@ class HappinessWave(Node):
         super().__init__('happiness_wave_demo')
 
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            durability=DurabilityPolicy.VOLATILE,
-            depth=10
-        )
-
-        # QoS per la navigazione (goal_pose), compatibile con la nav stack (RELIABLE)
-        goal_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.VOLATILE,
             depth=10
         )
 
-        # Publishers
         self.neck_pub = self.create_publisher(ExtendedJointState, neck_target_topic, qos)
         self.left_arm_pub = self.create_publisher(ExtendedJointState, left_arm_topic, qos)
         self.right_arm_pub = self.create_publisher(ExtendedJointState, right_arm_topic, qos)
-        # self.face_pub = self.create_publisher(String, '/targets/face_animation', qos)
-        self.goal_pub = self.create_publisher(PoseStamped, goal_pose_topic, goal_qos)
+        self.goal_pub = self.create_publisher(PoseStamped, goal_pose_topic, qos)
 
-        # Subscriber (log only)
         self.create_subscription(PointCloud2, pointcloud_topic, self._on_pointcloud, qos)
 
-        # ---------------- Configurazione collo (neutro, guarda avanti) ---------------- #
         self.neck_names = [
-            "HED_NECK_FRONTAL_JOINT",      # Roll
-            "HED_NECK_SAGITTAL_JOINT",     # Pitch
-            "HED_NECK_TRANSVERSAL_JOINT"   # Yaw
+            "HED_NECK_FRONTAL_JOINT",
+            "HED_NECK_SAGITTAL_JOINT",
+            "HED_NECK_TRANSVERSAL_JOINT"
         ]
-        self.neck_pos = [0.0, 0.0, 0.0]   # testa dritta, sguardo avanti
+        self.neck_pos = [0.0, 0.0, 0.0]
 
-        # ---------------- Configurazione braccia ---------------- #
-        # Ordine joint per ciascun braccio:
-        # [shoulder_sagittal, shoulder_frontal, shoulder_transversal,
-        #  elbow_sagittal, wrist_frontal, wrist_transversal, wrist_sagittal]
         self.left_arm_names = [
             "ARM_LEFT_SHOULDER_SAGITTAL_JOINT", "ARM_LEFT_SHOULDER_FRONTAL_JOINT",
             "ARM_LEFT_SHOULDER_TRANSVERSAL_JOINT", "ARM_LEFT_ELBOW_SAGITTAL_JOINT",
@@ -101,24 +98,20 @@ class HappinessWave(Node):
             "ARM_RIGHT_WRIST_SAGITTAL_JOINT"
         ]
 
-        # Posizione base "braccio alzato" (gomito piegato, braccio in alto)
-        # shoulder_frontal negativo/positivo solleva il braccio lateralmente verso l'alto
-        self.left_arm_base = [-0.2, -1.4, 0.0, -1.4, 0.0, 0.0, 0.0]
-        self.right_arm_base = [-0.2, 1.4, 0.0, -1.4, 0.0, 0.0, 0.0]
+        self.left_arm_base = [-1.0, 0.2, 0.0, -1.2, 0.0, 0.0, 0.0]
+        self.right_arm_base = [-1.0, 0.2, 0.0, -1.2, 0.0, 0.0, 0.0]
+        
+        self.reset_arm_base = [0.0, 0.0, 0.0, -0.3, 0.0, 0.0, 0.0]
 
-        # Indice del giunto su cui applichiamo l'oscillazione (polso transversal = "wave")
-        self.wave_joint_index = 5  # wrist_transversal
-        self.wave_amplitude = 0.5   # rad
-        self.wave_frequency = 1.5   # Hz
+        self.wave_joint_index = 5
+        self.wave_amplitude = 0.5
+        self.wave_frequency = 1.5
 
-        # ---------------- Timing ---------------- #
         self.start_time = self.get_clock().now().nanoseconds / 1e9
-        self.duration = 6.0  # secondi totali del saluto
-        self.timer = self.create_timer(0.05, self.publish_wave_stream)  # 20 Hz
+        self.duration = 6.0
+        self.timer = self.create_timer(0.05, self.publish_wave_stream)
 
         self.get_logger().info('Saluto felice avviato: braccia alzate + wave per 6s')
-
-    # -------------------------- Callbacks ---------------------------------- #
 
     def _on_pointcloud(self, msg: PointCloud2) -> None:
         pass
@@ -126,18 +119,13 @@ class HappinessWave(Node):
     def publish_wave_stream(self) -> None:
         now = self.get_clock().now().nanoseconds / 1e9
         elapsed = now - self.start_time
-        
-        # face_msg = String()
-	# face_msg.data = "FRIENDLY_SMILE"
-	# sound_msg.data = "HAPPY_COOING"
-	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:
-            self.get_logger().info('Saluto completato. Nodo in standby.')
+            self.get_logger().info('Saluto completato. Torno in posizione di default.')
+            self.publish_default_pose()
             self.timer.cancel()
             return
 
-        # Oscillazione sinusoidale per il movimento di saluto
         wave_offset = self.wave_amplitude * math.sin(2.0 * math.pi * self.wave_frequency * elapsed)
 
         left_pos = list(self.left_arm_base)
@@ -145,16 +133,31 @@ class HappinessWave(Node):
         left_pos[self.wave_joint_index] += wave_offset
         right_pos[self.wave_joint_index] += wave_offset
 
-        # Collo neutro, fermo
         neck_msg = make_extended_joint_state(self.neck_names, self.neck_pos)
         self.neck_pub.publish(neck_msg)
 
-        # Braccia in movimento di saluto
         left_msg = make_extended_joint_state(self.left_arm_names, left_pos)
         self.left_arm_pub.publish(left_msg)
 
         right_msg = make_extended_joint_state(self.right_arm_names, right_pos)
         self.right_arm_pub.publish(right_msg)
+
+    def publish_default_pose(self) -> None:
+        self.get_logger().info('Pubblicazione posizione di default...')
+        
+        for i in range(20):
+            neck_msg = make_extended_joint_state(self.neck_names, self.neck_pos)
+            self.neck_pub.publish(neck_msg)
+
+            left_msg = make_extended_joint_state(self.left_arm_names, self.reset_arm_base)
+            self.left_arm_pub.publish(left_msg)
+
+            right_msg = make_extended_joint_state(self.right_arm_names, self.reset_arm_base)
+            self.right_arm_pub.publish(right_msg)
+            
+            time.sleep(0.1)
+        
+        self.get_logger().info('Posizione di default pubblicata (braccia lungo il corpo).')
 
     def _publish_goal_absolute(self, *, frame_id: str, x: float, y: float, yaw: float) -> None:
         msg = PoseStamped()
@@ -168,9 +171,12 @@ class HappinessWave(Node):
         self.get_logger().info(f"Goal published: x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}")
 
 
-# ------------------------------ Main --------------------------------------- #
-
 def main():
+    global node
+    
+    signal.signal(signal.SIGINT, signal_handler_sigint)
+    signal.signal(signal.SIGTSTP, signal_handler_sigtstp)
+    
     rclpy.init()
     node = HappinessWave(
         pointcloud_topic='point_cloud',
@@ -182,11 +188,15 @@ def main():
     )
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+    except Exception as e:
+        node.get_logger().error(f'Errore: {e}')
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception:
+            pass
 
 
 if __name__ == '__main__':

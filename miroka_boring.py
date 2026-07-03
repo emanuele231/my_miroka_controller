@@ -103,7 +103,7 @@ class BoringDemo(Node):
     def _on_pointcloud(self, msg: PointCloud2) -> None:
         pass
 
-    def publish_confusion_stream(self) -> None:
+    def publish_boring_stream(self) -> None:
         now = self.get_clock().now().nanoseconds / 1e9
         elapsed = now - self.start_time
         
@@ -143,7 +143,7 @@ class BoringDemo(Node):
 
 def main():
     rclpy.init()
-    node = ConfusionDemo(
+    node = BoringDemo(
         pointcloud_topic='point_cloud',
         ears_target_topic='/targets/ears',
         neck_target_topic='/targets/neck',
