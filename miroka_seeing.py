@@ -111,6 +111,10 @@ class SeeingDemo(Node):
         
         self.reset_arm_base = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         
+        self.default_neck = [0.0, 0.0, 0.0]
+        
+        self.default_ears = [0.0, 0.0]
+        
         self.wave_joint_index = 5
         self.wave_amplitude = 0.5
         self.wave_frequency = 1.5
