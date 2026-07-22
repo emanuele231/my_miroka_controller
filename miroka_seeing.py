@@ -64,7 +64,7 @@ class SeeingDemo(Node):
                  right_arm_topic: str = '/targets/right_arm',
                  goal_pose_topic: str = 'goal_pose',
                  goal_frame: str = 'map'):
-        super().__init__('seeing_demo')
+        super().__init__('SeeingDemo')
 
         qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
