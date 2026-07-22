@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ROS 2 — fear (still arms, ears down)
+ROS 2 — Fear (arms forward, hands open, ears down)
 """
 
 from typing import List
@@ -18,8 +18,8 @@ from sensor_msgs.msg import PointCloud2, JointState
 from geometry_msgs.msg import PoseStamped, Quaternion
 from enchanted_msgs.msg import ExtendedJointState, ControlMode
 
-from enum import Enum
 
+# ------------------------------ Helpers ------------------------------------ #
 
 def yaw_to_quaternion(yaw_rad: float) -> Quaternion:
     q = Quaternion()
@@ -42,6 +42,7 @@ def make_extended_joint_state(names: List[str], positions: List[float]) -> Exten
     msg.control_mode = ControlMode(state=ControlMode.POSITION)
     return msg
 
+
 def signal_handler_sigint(signum, frame):
     print("\nCtrl+C rilevato. Chiusura pulita...")
     if 'node' in globals():
@@ -56,6 +57,8 @@ def signal_handler_sigtstp(signum, frame):
     os.kill(os.getpid(), signal.SIGSTOP)
 
 
+# ------------------------------ Node --------------------------------------- #
+
 class FearDemo(Node):
     def __init__(self,
                  pointcloud_topic: str = 'point_cloud',
@@ -63,6 +66,8 @@ class FearDemo(Node):
                  neck_target_topic: str = '/targets/neck',
                  left_arm_topic: str = '/targets/left_arm',
                  right_arm_topic: str = '/targets/right_arm',
+                 right_fingers_topic: str = '/targets/arms/right/fingers',
+                 left_fingers_topic: str = '/targets/arms/left/fingers',
                  goal_pose_topic: str = 'goal_pose',
                  goal_frame: str = 'map'):
         super().__init__('fear_demo')
@@ -73,27 +78,25 @@ class FearDemo(Node):
             depth=10
         )
 
+        # Publishers
         self.neck_pub = self.create_publisher(ExtendedJointState, neck_target_topic, qos)
         self.ears_pub = self.create_publisher(ExtendedJointState, ears_target_topic, qos)
         self.left_arm_pub = self.create_publisher(ExtendedJointState, left_arm_topic, qos)
         self.right_arm_pub = self.create_publisher(ExtendedJointState, right_arm_topic, qos)
-        # self.face_pub = self.create_publisher(String, '/targets/face_animation', qos)
+        self.left_fingers_pub = self.create_publisher(ExtendedJointState, left_fingers_topic, qos)
+        self.right_fingers_pub = self.create_publisher(ExtendedJointState, right_fingers_topic, qos)
         self.goal_pub = self.create_publisher(PoseStamped, goal_pose_topic, qos)
 
+        # Subscriber
         self.create_subscription(PointCloud2, pointcloud_topic, self._on_pointcloud, qos)
 
+        # Joint names
         self.neck_names = [
             "HED_NECK_FRONTAL_JOINT",
             "HED_NECK_SAGITTAL_JOINT",
             "HED_NECK_TRANSVERSAL_JOINT"
         ]
-        self.neck_pos = [0.0, -0.15, 0.0]   # testa inclinata in basso
-
-        self.ears_names = [
-            "HED_EAR_LEFT_JOINT", "HED_EAR_RIGHT_JOINT"
-        ]
-        self.ears_pos = [-1.0, -1.0]   # orecchie completamente in basso
-
+        self.ears_names = ["HED_EAR_LEFT_JOINT", "HED_EAR_RIGHT_JOINT"]
         self.left_arm_names = [
             "ARM_LEFT_SHOULDER_SAGITTAL_JOINT", "ARM_LEFT_SHOULDER_FRONTAL_JOINT",
             "ARM_LEFT_SHOULDER_TRANSVERSAL_JOINT", "ARM_LEFT_ELBOW_SAGITTAL_JOINT",
@@ -106,23 +109,29 @@ class FearDemo(Node):
             "ARM_RIGHT_WRIST_FRONTAL_JOINT", "ARM_RIGHT_WRIST_TRANSVERSAL_JOINT",
             "ARM_RIGHT_WRIST_SAGITTAL_JOINT"
         ]
+        self.left_fingers_names = ["LEFT_FINGERS"]
+        self.right_fingers_names = ["RIGHT_FINGERS"]
 
-        self.left_arm_base = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        self.right_arm_base = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        
-        self.default_arms = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        # Posizioni emozione paura
+        self.neck_pos = [0.0, 0.0, 0.0]
+        self.ears_pos = [-1.0, -1.0]         # orecchie completamente in basso
+        self.left_arm_base = [-1.0, -0.2, 0.0, -1.6, 0.8, 0.0, 0.0]   # braccia in avanti, gomiti piegati, mani alzate
+        self.right_arm_base = [-1.0, 0.2, 0.0, -1.6, 0.8, 0.0, 0.0]
+        self.fingers_base = [1.5]             # dita aperte al massimo
+
+        # Posizioni default (riposo)
         self.default_neck = [0.0, 0.0, 0.0]
         self.default_ears = [0.0, 0.0]
-        
-        self.wave_joint_index = 5
-        self.wave_amplitude = 0.5
-        self.wave_frequency = 1.5
+        self.default_arms = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 
+        # Timing
         self.start_time = self.get_clock().now().nanoseconds / 1e9
         self.duration = 6.0
         self.timer = self.create_timer(0.05, self.publish_fear_stream)
 
-        self.get_logger().info('Paura avviata: braccia ferme, orecchie basse')
+        self.get_logger().info('Paura avviata: braccia in avanti, mani aperte alzate, orecchie basse, per 6s')
+
+    # -------------------------- Callbacks ---------------------------------- #
 
     def _on_pointcloud(self, msg: PointCloud2) -> None:
         pass
@@ -130,11 +139,6 @@ class FearDemo(Node):
     def publish_fear_stream(self) -> None:
         now = self.get_clock().now().nanoseconds / 1e9
         elapsed = now - self.start_time
-        
-        # face_msg = String()
-	# face_msg.data = "SCARED_1"
-	# sound_msg.data = "FEAR_BREATH"
-	# self.face_pub.publish(face_msg)
 
         if elapsed > self.duration:
             self.get_logger().info('Paura completata. Nodo in standby.')
@@ -142,38 +146,26 @@ class FearDemo(Node):
             self.timer.cancel()
             return
 
-        neck_msg = make_extended_joint_state(self.neck_names, self.neck_pos)
-        self.neck_pub.publish(neck_msg)
+        self.neck_pub.publish(make_extended_joint_state(self.neck_names, self.neck_pos))
+        self.ears_pub.publish(make_extended_joint_state(self.ears_names, self.ears_pos))
+        self.left_arm_pub.publish(make_extended_joint_state(self.left_arm_names, self.left_arm_base))
+        self.right_arm_pub.publish(make_extended_joint_state(self.right_arm_names, self.right_arm_base))
+        self.left_fingers_pub.publish(make_extended_joint_state(self.left_fingers_names, self.fingers_base))
+        self.right_fingers_pub.publish(make_extended_joint_state(self.right_fingers_names, self.fingers_base))
 
-        ears_msg = make_extended_joint_state(self.ears_names, self.ears_pos)
-        self.ears_pub.publish(ears_msg)
-
-        left_msg = make_extended_joint_state(self.left_arm_names, self.left_arm_base)
-        self.left_arm_pub.publish(left_msg)
-
-        right_msg = make_extended_joint_state(self.right_arm_names, self.right_arm_base)
-        self.right_arm_pub.publish(right_msg)
-        
     def publish_default_pose(self) -> None:
         self.get_logger().info('Pubblicazione posizione di default...')
-        
-        for i in range(20):
-            neck_msg = make_extended_joint_state(self.neck_names, self.default_neck)
-            self.neck_pub.publish(neck_msg)
 
-            ears_msg = make_extended_joint_state(self.ears_names, self.ears_pos)
-            self.ears_pub.publish(ears_msg)
-
-            left_msg = make_extended_joint_state(self.left_arm_names, self.reset_arm_base)
-            self.left_arm_pub.publish(left_msg)
-
-            right_msg = make_extended_joint_state(self.right_arm_names, self.reset_arm_base)
-            self.right_arm_pub.publish(right_msg)
-            
+        for _ in range(20):
+            self.neck_pub.publish(make_extended_joint_state(self.neck_names, self.default_neck))
+            self.ears_pub.publish(make_extended_joint_state(self.ears_names, self.default_ears))
+            self.left_arm_pub.publish(make_extended_joint_state(self.left_arm_names, self.default_arms))
+            self.right_arm_pub.publish(make_extended_joint_state(self.right_arm_names, self.default_arms))
+            self.left_fingers_pub.publish(make_extended_joint_state(self.left_fingers_names, [0.0]))
+            self.right_fingers_pub.publish(make_extended_joint_state(self.right_fingers_names, [0.0]))
             time.sleep(0.1)
-        
-        self.get_logger().info('Posizione di default pubblicata (braccia lungo il corpo).')
 
+        self.get_logger().info('Posizione di default pubblicata.')
 
     def _publish_goal_absolute(self, *, frame_id: str, x: float, y: float, yaw: float) -> None:
         msg = PoseStamped()
@@ -187,13 +179,14 @@ class FearDemo(Node):
         self.get_logger().info(f"Goal published: x={x:.2f}, y={y:.2f}, yaw={yaw:.2f}")
 
 
-def main():
+# ------------------------------ Main --------------------------------------- #
 
+def main():
     global node
-    
+
     signal.signal(signal.SIGINT, signal_handler_sigint)
     signal.signal(signal.SIGTSTP, signal_handler_sigtstp)
-    
+
     rclpy.init()
     node = FearDemo(
         pointcloud_topic='point_cloud',
@@ -201,6 +194,8 @@ def main():
         neck_target_topic='/targets/neck',
         left_arm_topic='/targets/left_arm',
         right_arm_topic='/targets/right_arm',
+        right_fingers_topic='/targets/arms/right/fingers',
+        left_fingers_topic='/targets/arms/left/fingers',
         goal_pose_topic='goal_pose',
         goal_frame='map',
     )

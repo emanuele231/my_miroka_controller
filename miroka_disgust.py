@@ -85,7 +85,7 @@ class DisgustDemo(Node):
             "HED_NECK_SAGITTAL_JOINT",
             "HED_NECK_TRANSVERSAL_JOINT"
         ]
-        self.neck_pos = [0.0, 0.15, 0.0]  
+        self.neck_pos = [0.15, 0.0, 0.0]  
 
         self.ears_names = [
             "HED_EAR_LEFT_JOINT", "HED_EAR_RIGHT_JOINT"
