@@ -117,7 +117,7 @@ class SeeingDemo(Node):
 
         self.start_time = self.get_clock().now().nanoseconds / 1e9
         self.duration = 6.0
-        self.timer = self.create_timer(0.05, self.publish_sadness_stream)
+        self.timer = self.create_timer(0.05, self.publish_seeing_stream)
 
         self.get_logger().info('"ho visto qualcuno" avviata: braccia ferme, orecchie basse, testa china, per 6s')
 
